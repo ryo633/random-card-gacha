@@ -21,7 +21,7 @@ function CardBackFace({ className = '' }: { className?: string }) {
   if (!err) {
     return (
       <img
-        src="/card-back.jpg"
+        src="/card-back.webp"
         className={`w-full h-full object-cover ${className}`}
         alt=""
         draggable={false}

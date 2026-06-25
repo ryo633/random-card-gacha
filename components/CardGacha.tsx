@@ -151,7 +151,7 @@ function Sparkles() {
 }
 
 // ── Password Modal ────────────────────────────────────────────────────────
-const EDIT_PASSWORD = process.env.NEXT_PUBLIC_EDIT_PASSWORD ?? 'kspi2025';
+const EDIT_PASSWORD = process.env.NEXT_PUBLIC_EDIT_PASSWORD ?? 'syogai08';
 
 function PasswordModal({ onSuccess, onClose }: { onSuccess: () => void; onClose: () => void }) {
   const [input, setInput] = useState('');

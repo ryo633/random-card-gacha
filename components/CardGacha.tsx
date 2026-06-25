@@ -11,11 +11,13 @@ const DEFAULT_WORDS = [
 ];
 
 const FAN_N = 13;
+// Card dimensions derived from actual image ratio (957×1356)
+const IMG_W = 957;
+const IMG_H = 1356;
 const CARD_W = 180;
-const CARD_H = 252;
-// Fan card size — same 5:7 aspect ratio as revealed card, smaller
+const CARD_H = Math.round(CARD_W * IMG_H / IMG_W); // 255
 const DECK_W = 110;
-const DECK_H = 154;
+const DECK_H = Math.round(DECK_W * IMG_H / IMG_W); // 156
 
 // ── Card back: real image with SVG fallback ────────────────────────────────
 function CardBackFace({ className = '' }: { className?: string }) {
@@ -24,7 +26,7 @@ function CardBackFace({ className = '' }: { className?: string }) {
     return (
       <img
         src="/card-back.webp"
-        className={`w-full h-full object-contain ${className}`}
+        className={`w-full h-full object-fill ${className}`}
         alt=""
         draggable={false}
         onError={() => setErr(true)}
@@ -267,7 +269,7 @@ export default function CardGacha() {
       const w = window.innerWidth;
       // Desktop: larger cards; mobile: smaller cards (same 5:7 ratio)
       const cw = w >= 480 ? 140 : 110;
-      const ch = w >= 480 ? 196 : 154;
+      const ch = Math.round(cw * IMG_H / IMG_W); // exact image ratio
       setDeckCardW(cw);
       setDeckCardH(ch);
       // Shrink angle if fan doesn't fit: visual width = cw + 2*ch*sin(angle)

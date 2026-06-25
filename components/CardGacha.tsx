@@ -15,7 +15,6 @@ const CARD_W = 180;
 const CARD_H = 252;
 
 // ── Card back: real image with SVG fallback ────────────────────────────────
-// Place your image as /public/card-back.jpg to use it automatically.
 function CardBackFace({ className = '' }: { className?: string }) {
   const [err, setErr] = useState(false);
   if (!err) {
@@ -72,11 +71,8 @@ function CardBackSVG() {
         <circle cx="178" cy="262" r="72" fill="none" stroke="#3b82f6" strokeWidth="23" opacity=".65" />
         <path d="M55 280 L166 38 L198 58 L87 280 Z" fill="url(#gdG)" opacity=".84" />
         <path d="M92 280 L185 68 L200 76 L108 280 Z" fill="url(#gdG)" opacity=".28" />
-        {/* Flame outer */}
         <path d="M158 102 C144 102 128 92 122 76 C116 60 120 44 128 34 C124 26 122 16 126 8 C130 2 138 2 140 10 C142 18 142 28 144 26 C146 18 150 10 154 6 C156 2 162 2 164 6 C166 10 164 20 166 26 C168 28 170 18 172 10 C174 2 180 4 182 12 C184 22 180 32 176 40 C184 52 188 66 182 80 C176 94 168 102 158 102 Z" fill="url(#gdG)" opacity=".96" />
-        {/* Flame inner blue */}
         <path d="M158 92 C150 92 140 84 136 72 C132 60 136 48 142 40 C140 34 138 26 140 20 C142 14 146 14 148 20 C150 26 150 34 150 30 C152 22 154 14 156 10 C158 14 158 22 160 30 C160 34 162 24 164 20 C166 14 170 16 170 22 C172 30 168 40 166 46 C172 56 174 68 168 78 C164 88 160 92 158 92 Z" fill="url(#bdG)" opacity=".92" />
-        {/* Flame highlight */}
         <path d="M158 82 C155 80 152 72 153 60 C154 50 156 42 158 38 C160 42 162 50 162 60 C162 72 160 82 158 82 Z" fill="url(#bhG)" opacity=".8" />
         <ellipse cx="158" cy="12" rx="5" ry="9" fill="#fef9c3" opacity=".65" />
         <ellipse cx="154" cy="100" rx="28" ry="7" fill="url(#bglow)" />
@@ -150,7 +146,7 @@ function Sparkles() {
   );
 }
 
-// ── Password Modal ────────────────────────────────────────────────────────
+// ── Password Modal ─────────────────────────────────────────────────────────
 const EDIT_PASSWORD = process.env.NEXT_PUBLIC_EDIT_PASSWORD ?? 'syogai08';
 
 function PasswordModal({ onSuccess, onClose }: { onSuccess: () => void; onClose: () => void }) {
@@ -239,6 +235,9 @@ export default function CardGacha() {
   const [flyWord, setFlyWord] = useState('');
   const [showSparkles, setShowSparkles] = useState(false);
   const [deckVisible, setDeckVisible] = useState(true);
+  // Mobile: scale down the fan deck to fit the screen
+  const [deckScale, setDeckScale] = useState(1);
+  const [isSaving, setIsSaving] = useState(false);
 
   const stageRef = useRef<HTMLDivElement>(null);
   const deckRef = useRef<HTMLDivElement>(null);
@@ -246,14 +245,26 @@ export default function CardGacha() {
   const flyCardRef = useRef<HTMLDivElement>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
+  // Load words from server (shared across all devices)
   useEffect(() => {
-    const saved = localStorage.getItem('gacha-words');
-    if (saved) {
-      try {
-        const p = JSON.parse(saved);
-        if (Array.isArray(p) && p.length > 0) setWords(p);
-      } catch {}
-    }
+    fetch('/api/words')
+      .then(r => r.json())
+      .then((data: string[]) => {
+        if (Array.isArray(data) && data.length > 0) setWords(data);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Responsive deck scale for mobile
+  useEffect(() => {
+    const update = () => {
+      const w = window.innerWidth;
+      // Fan with 13 cards at ±32° visually spans ~380px; leave 16px padding each side
+      setDeckScale(w < 412 ? Math.min(1, (w - 32) / 380) : 1);
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
   }, []);
 
   const clearTimers = () => { timersRef.current.forEach(clearTimeout); timersRef.current = []; };
@@ -270,7 +281,7 @@ export default function CardGacha() {
     const word = words[Math.floor(Math.random() * words.length)];
     const si = fixedIdx !== undefined ? fixedIdx : Math.floor(Math.random() * FAN_N);
     const angle = getFanAngle(si);
-    const scale = 150 / CARD_W;
+    const cardScale = 150 / CARD_W;
     setFlyWord(word);
 
     const stage = stageRef.current;
@@ -290,7 +301,7 @@ export default function CardGacha() {
     flyCard.style.transition = 'none';
     flyCard.style.left = `${dCX - CARD_W / 2}px`;
     flyCard.style.top = `${dCY - CARD_H / 2}px`;
-    flyCard.style.transform = `scale(${scale}) rotate(${angle}deg)`;
+    flyCard.style.transform = `scale(${cardScale}) rotate(${angle}deg)`;
     flyCard.style.opacity = '1';
 
     const delay = fixedIdx !== undefined ? 80 : 260;
@@ -330,10 +341,19 @@ export default function CardGacha() {
     if (flyCard) { flyCard.style.transition = 'none'; flyCard.style.opacity = '0'; flyCard.style.boxShadow = 'none'; }
   };
 
-  const handleSaveWords = (newWords: string[]) => {
+  const handleSaveWords = async (newWords: string[]) => {
     setWords(newWords);
-    localStorage.setItem('gacha-words', JSON.stringify(newWords));
     setShowEditor(false);
+    setIsSaving(true);
+    try {
+      await fetch('/api/words', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newWords),
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const isIdle = flyState === 'hidden';
@@ -365,6 +385,8 @@ export default function CardGacha() {
             opacity: deckVisible ? 1 : 0,
             transition: 'opacity 0.4s ease',
             pointerEvents: busy ? 'none' : 'auto',
+            transform: `scale(${deckScale})`,
+            transformOrigin: 'center top',
           }}
         >
           {Array.from({ length: FAN_N }).map((_, i) => {
@@ -384,10 +406,21 @@ export default function CardGacha() {
                   boxShadow: '1px 2px 8px rgba(0,0,0,.18)',
                   transition: 'transform 0.2s ease, filter 0.2s ease',
                   cursor: isIdle ? (isHovered ? 'pointer' : 'default') : 'default',
+                  // Larger touch target on mobile
+                  touchAction: 'none',
                 }}
                 onMouseEnter={() => { if (!busy) setHoveredIdx(i); }}
                 onMouseLeave={() => { if (hoveredIdx === i) setHoveredIdx(null); }}
                 onClick={() => { if (!busy && isIdle) doDraw(i); }}
+                // Touch: tap lifts and draws immediately
+                onTouchStart={(e) => {
+                  e.preventDefault();
+                  if (!busy && isIdle) setHoveredIdx(i);
+                }}
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  if (!busy && isIdle) doDraw(i);
+                }}
               >
                 <CardBackFace />
               </div>
@@ -395,12 +428,12 @@ export default function CardGacha() {
           })}
         </div>
 
-        {/* Deck count + hover hint */}
+        {/* Deck count + hint */}
         {isIdle && (
           <div className="text-center mt-2" style={{ minHeight: 32 }}>
             <p className="text-xs text-blue-400">{words.length} 枚の単語カード</p>
             <p className="text-xs text-indigo-300 mt-0.5" style={{ minHeight: 16 }}>
-              {hoveredIdx !== null ? 'クリックしてこのカードを引く' : ''}
+              {hoveredIdx !== null ? 'タップ / クリックしてこのカードを引く' : ''}
             </p>
           </div>
         )}
@@ -425,16 +458,13 @@ export default function CardGacha() {
               transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
             }}
           >
-            {/* Back face (decorated) */}
             <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', borderRadius: 12, overflow: 'hidden' }}>
               <CardBackFace />
             </div>
-            {/* Front face (word) */}
             <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)', borderRadius: 12, overflow: 'hidden' }}>
               <CardWordFace word={flyWord} />
             </div>
           </div>
-          {/* Sparkles */}
           {showSparkles && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-visible">
               <Sparkles />
@@ -469,13 +499,14 @@ export default function CardGacha() {
 
           <button
             onClick={() => setShowPasswordModal(true)}
-            className="flex items-center gap-2 px-5 py-2 rounded-full border border-blue-200 text-blue-500 text-sm hover:bg-blue-50 active:scale-95 transition-all mt-1"
+            disabled={isSaving}
+            className="flex items-center gap-2 px-5 py-2 rounded-full border border-blue-200 text-blue-500 text-sm hover:bg-blue-50 active:scale-95 transition-all mt-1 disabled:opacity-50"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
             </svg>
-            単語リストを編集
+            {isSaving ? '保存中...' : '単語リストを編集'}
           </button>
         </div>
       </div>

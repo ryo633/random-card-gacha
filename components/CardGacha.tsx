@@ -150,6 +150,50 @@ function Sparkles() {
   );
 }
 
+// ── Password Modal ────────────────────────────────────────────────────────
+const EDIT_PASSWORD = process.env.NEXT_PUBLIC_EDIT_PASSWORD ?? 'kspi2025';
+
+function PasswordModal({ onSuccess, onClose }: { onSuccess: () => void; onClose: () => void }) {
+  const [input, setInput] = useState('');
+  const [error, setError] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const handleSubmit = () => {
+    if (input === EDIT_PASSWORD) {
+      onSuccess();
+    } else {
+      setError(true);
+      setInput('');
+      setTimeout(() => setError(false), 1500);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs p-6 flex flex-col gap-4">
+        <h2 className="text-lg font-bold text-gray-800 text-center">パスワードを入力</h2>
+        <input
+          ref={inputRef}
+          type="password"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+          className={`w-full border rounded-xl p-3 text-center text-lg focus:outline-none focus:ring-2 transition-colors ${error ? 'border-red-400 ring-red-300 bg-red-50' : 'border-gray-200 focus:ring-blue-300'}`}
+          placeholder="••••••••"
+        />
+        {error && <p className="text-red-500 text-sm text-center -mt-2">パスワードが違います</p>}
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">キャンセル</button>
+          <button onClick={handleSubmit} className="flex-1 py-2 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-colors">確認</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Word Editor Modal ──────────────────────────────────────────────────────
 function WordEditor({ words, onSave, onClose }: {
   words: string[];
@@ -190,6 +234,7 @@ export default function CardGacha() {
   const [busy, setBusy] = useState(false);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const [showEditor, setShowEditor] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [flyState, setFlyState] = useState<'hidden' | 'fly' | 'flip' | 'done'>('hidden');
   const [flyWord, setFlyWord] = useState('');
   const [showSparkles, setShowSparkles] = useState(false);
@@ -423,7 +468,7 @@ export default function CardGacha() {
           {!isIdle && !isRevealed && <div style={{ height: 56 }} />}
 
           <button
-            onClick={() => setShowEditor(true)}
+            onClick={() => setShowPasswordModal(true)}
             className="flex items-center gap-2 px-5 py-2 rounded-full border border-blue-200 text-blue-500 text-sm hover:bg-blue-50 active:scale-95 transition-all mt-1"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -435,6 +480,12 @@ export default function CardGacha() {
         </div>
       </div>
 
+      {showPasswordModal && (
+        <PasswordModal
+          onSuccess={() => { setShowPasswordModal(false); setShowEditor(true); }}
+          onClose={() => setShowPasswordModal(false)}
+        />
+      )}
       {showEditor && (
         <WordEditor words={words} onSave={handleSaveWords} onClose={() => setShowEditor(false)} />
       )}

@@ -235,9 +235,10 @@ export default function CardGacha() {
   const [flyWord, setFlyWord] = useState('');
   const [showSparkles, setShowSparkles] = useState(false);
   const [deckVisible, setDeckVisible] = useState(true);
-  // Mobile: scale down the fan deck to fit the screen
-  const [deckScale, setDeckScale] = useState(1);
+  // Mobile: reduce fan angle to fit narrow screens
+  const [fanMaxAngle, setFanMaxAngle] = useState(32);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<'ok' | 'err' | null>(null);
 
   const stageRef = useRef<HTMLDivElement>(null);
   const deckRef = useRef<HTMLDivElement>(null);
@@ -255,12 +256,14 @@ export default function CardGacha() {
       .catch(() => {});
   }, []);
 
-  // Responsive deck scale for mobile
+  // Responsive fan angle: shrink angle so the fan fits narrow screens
   useEffect(() => {
     const update = () => {
-      const w = window.innerWidth;
-      // Fan with 13 cards at ±32° visually spans ~380px; leave 16px padding each side
-      setDeckScale(w < 412 ? Math.min(1, (w - 32) / 380) : 1);
+      const available = window.innerWidth - 48; // 24px margin each side
+      // Visual width = 150 + 2 * 172 * sin(angle)
+      const sinVal = (available - 150) / 344;
+      const angle = Math.min(32, Math.max(16, Math.asin(Math.min(1, Math.max(0, sinVal))) * 180 / Math.PI));
+      setFanMaxAngle(angle);
     };
     update();
     window.addEventListener('resize', update);
@@ -270,7 +273,7 @@ export default function CardGacha() {
   const clearTimers = () => { timersRef.current.forEach(clearTimeout); timersRef.current = []; };
   const T = (fn: () => void, ms: number) => { const id = setTimeout(fn, ms); timersRef.current.push(id); };
 
-  const getFanAngle = (i: number) => -32 + (64 / (FAN_N - 1)) * i;
+  const getFanAngle = (i: number) => -fanMaxAngle + (2 * fanMaxAngle / (FAN_N - 1)) * i;
   const getFanYOffset = (i: number) => Math.pow(Math.abs(i - (FAN_N - 1) / 2), 1.3) * 1.8;
 
   const doDraw = useCallback((fixedIdx?: number) => {
@@ -346,13 +349,17 @@ export default function CardGacha() {
     setShowEditor(false);
     setIsSaving(true);
     try {
-      await fetch('/api/words', {
+      const res = await fetch('/api/words', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newWords),
       });
+      setSaveMsg(res.ok ? 'ok' : 'err');
+    } catch {
+      setSaveMsg('err');
     } finally {
       setIsSaving(false);
+      setTimeout(() => setSaveMsg(null), 3000);
     }
   };
 
@@ -385,8 +392,6 @@ export default function CardGacha() {
             opacity: deckVisible ? 1 : 0,
             transition: 'opacity 0.4s ease',
             pointerEvents: busy ? 'none' : 'auto',
-            transform: `scale(${deckScale})`,
-            transformOrigin: 'center top',
           }}
         >
           {Array.from({ length: FAN_N }).map((_, i) => {
@@ -508,6 +513,8 @@ export default function CardGacha() {
             </svg>
             {isSaving ? '保存中...' : '単語リストを編集'}
           </button>
+          {saveMsg === 'ok' && <p className="text-xs text-green-500">✓ 保存しました（全端末に反映）</p>}
+          {saveMsg === 'err' && <p className="text-xs text-red-500">✗ 保存失敗 — 接続を確認してください</p>}
         </div>
       </div>
 

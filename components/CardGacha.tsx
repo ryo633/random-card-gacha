@@ -238,7 +238,9 @@ export default function CardGacha() {
   const [flyWord, setFlyWord] = useState('');
   const [showSparkles, setShowSparkles] = useState(false);
   const [deckVisible, setDeckVisible] = useState(true);
-  // Mobile: reduce fan angle to fit narrow screens
+  // Responsive deck card size: larger on desktop, smaller on mobile
+  const [deckCardW, setDeckCardW] = useState(110);
+  const [deckCardH, setDeckCardH] = useState(154);
   const [fanMaxAngle, setFanMaxAngle] = useState(32);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<'ok' | 'err' | null>(null);
@@ -259,12 +261,18 @@ export default function CardGacha() {
       .catch(() => {});
   }, []);
 
-  // Responsive fan angle: shrink angle so the fan fits narrow screens
-  // Visual width = DECK_W + 2 * DECK_H * sin(angle)
+  // Responsive deck size + fan angle
   useEffect(() => {
     const update = () => {
-      const available = window.innerWidth - 48;
-      const sinVal = (available - DECK_W) / (2 * DECK_H);
+      const w = window.innerWidth;
+      // Desktop: larger cards; mobile: smaller cards (same 5:7 ratio)
+      const cw = w >= 480 ? 140 : 110;
+      const ch = w >= 480 ? 196 : 154;
+      setDeckCardW(cw);
+      setDeckCardH(ch);
+      // Shrink angle if fan doesn't fit: visual width = cw + 2*ch*sin(angle)
+      const available = w - 48;
+      const sinVal = (available - cw) / (2 * ch);
       const angle = Math.min(32, Math.max(16, Math.asin(Math.min(1, Math.max(0, sinVal))) * 180 / Math.PI));
       setFanMaxAngle(angle);
     };
@@ -298,7 +306,7 @@ export default function CardGacha() {
     const word = words[Math.floor(Math.random() * words.length)];
     const si = fixedIdx !== undefined ? fixedIdx : Math.floor(Math.random() * FAN_N);
     const angle = getFanAngle(si);
-    const cardScale = DECK_W / CARD_W;
+    const cardScale = deckCardW / CARD_W;
     setFlyWord(word);
 
     const stage = stageRef.current;
@@ -402,7 +410,7 @@ export default function CardGacha() {
         <div
           ref={deckRef}
           style={{
-            position: 'relative', width: DECK_W, height: DECK_H, flexShrink: 0,
+            position: 'relative', width: deckCardW, height: deckCardH, flexShrink: 0,
             opacity: deckVisible ? 1 : 0,
             transition: 'opacity 0.4s ease',
             pointerEvents: busy ? 'none' : 'auto',

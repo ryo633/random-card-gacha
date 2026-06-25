@@ -13,6 +13,9 @@ const DEFAULT_WORDS = [
 const FAN_N = 13;
 const CARD_W = 180;
 const CARD_H = 252;
+// Fan card size — same 5:7 aspect ratio as revealed card, smaller
+const DECK_W = 110;
+const DECK_H = 154;
 
 // ── Card back: real image with SVG fallback ────────────────────────────────
 function CardBackFace({ className = '' }: { className?: string }) {
@@ -257,11 +260,11 @@ export default function CardGacha() {
   }, []);
 
   // Responsive fan angle: shrink angle so the fan fits narrow screens
+  // Visual width = DECK_W + 2 * DECK_H * sin(angle)
   useEffect(() => {
     const update = () => {
-      const available = window.innerWidth - 48; // 24px margin each side
-      // Visual width = 150 + 2 * 172 * sin(angle)
-      const sinVal = (available - 150) / 344;
+      const available = window.innerWidth - 48;
+      const sinVal = (available - DECK_W) / (2 * DECK_H);
       const angle = Math.min(32, Math.max(16, Math.asin(Math.min(1, Math.max(0, sinVal))) * 180 / Math.PI));
       setFanMaxAngle(angle);
     };
@@ -269,6 +272,17 @@ export default function CardGacha() {
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
   }, []);
+
+  // Touch swipe: find card index under finger via elementFromPoint
+  const getCardIdxAtPoint = (x: number, y: number): number | null => {
+    let el = document.elementFromPoint(x, y) as HTMLElement | null;
+    while (el) {
+      const idx = el.dataset?.cardIndex;
+      if (idx !== undefined) return parseInt(idx);
+      el = el.parentElement;
+    }
+    return null;
+  };
 
   const clearTimers = () => { timersRef.current.forEach(clearTimeout); timersRef.current = []; };
   const T = (fn: () => void, ms: number) => { const id = setTimeout(fn, ms); timersRef.current.push(id); };
@@ -284,7 +298,7 @@ export default function CardGacha() {
     const word = words[Math.floor(Math.random() * words.length)];
     const si = fixedIdx !== undefined ? fixedIdx : Math.floor(Math.random() * FAN_N);
     const angle = getFanAngle(si);
-    const cardScale = 150 / CARD_W;
+    const cardScale = DECK_W / CARD_W;
     setFlyWord(word);
 
     const stage = stageRef.current;
@@ -388,10 +402,36 @@ export default function CardGacha() {
         <div
           ref={deckRef}
           style={{
-            position: 'relative', width: 150, height: 172, flexShrink: 0,
+            position: 'relative', width: DECK_W, height: DECK_H, flexShrink: 0,
             opacity: deckVisible ? 1 : 0,
             transition: 'opacity 0.4s ease',
             pointerEvents: busy ? 'none' : 'auto',
+            touchAction: 'none',
+          }}
+          // Desktop: mouse leave clears hover
+          onMouseLeave={() => setHoveredIdx(null)}
+          // Touch swipe: track finger across cards
+          onTouchStart={(e) => {
+            e.preventDefault();
+            if (!busy && isIdle) {
+              const t = e.touches[0];
+              const idx = getCardIdxAtPoint(t.clientX, t.clientY);
+              if (idx !== null) setHoveredIdx(idx);
+            }
+          }}
+          onTouchMove={(e) => {
+            e.preventDefault();
+            if (!busy && isIdle) {
+              const t = e.touches[0];
+              const idx = getCardIdxAtPoint(t.clientX, t.clientY);
+              if (idx !== null) setHoveredIdx(idx);
+            }
+          }}
+          onTouchEnd={(e) => {
+            e.preventDefault();
+            if (!busy && isIdle) {
+              doDraw(hoveredIdx ?? undefined);
+            }
           }}
         >
           {Array.from({ length: FAN_N }).map((_, i) => {
@@ -401,6 +441,7 @@ export default function CardGacha() {
             return (
               <div
                 key={i}
+                data-card-index={i}
                 style={{
                   position: 'absolute', inset: 0,
                   transformOrigin: '50% 100%',
@@ -409,23 +450,11 @@ export default function CardGacha() {
                   filter: isHovered ? 'drop-shadow(0 -10px 16px rgba(59,130,246,.38))' : 'none',
                   borderRadius: 10, overflow: 'hidden',
                   boxShadow: '1px 2px 8px rgba(0,0,0,.18)',
-                  transition: 'transform 0.2s ease, filter 0.2s ease',
+                  transition: 'transform 0.18s ease, filter 0.18s ease',
                   cursor: isIdle ? (isHovered ? 'pointer' : 'default') : 'default',
-                  // Larger touch target on mobile
-                  touchAction: 'none',
                 }}
                 onMouseEnter={() => { if (!busy) setHoveredIdx(i); }}
-                onMouseLeave={() => { if (hoveredIdx === i) setHoveredIdx(null); }}
                 onClick={() => { if (!busy && isIdle) doDraw(i); }}
-                // Touch: tap lifts and draws immediately
-                onTouchStart={(e) => {
-                  e.preventDefault();
-                  if (!busy && isIdle) setHoveredIdx(i);
-                }}
-                onTouchEnd={(e) => {
-                  e.preventDefault();
-                  if (!busy && isIdle) doDraw(i);
-                }}
               >
                 <CardBackFace />
               </div>

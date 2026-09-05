@@ -240,7 +240,7 @@ function WordEditor({ words, onSave, onClose }: {
           className="w-full border border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300 font-mono"
           placeholder="単語1&#10;単語2&#10;単語3" />
         <div className="flex items-center justify-between">
-          <button onClick={handleReset} className="text-xs text-orange-400 hover:text-orange-600 underline transition-colors font-medium">↩ デフォルトに戻す</button>
+          <button onClick={handleReset} className="text-xs text-gray-400 hover:text-gray-600 underline transition-colors">デフォルトに戻す</button>
           <div className="text-xs text-gray-400">{text.split('\n').filter(s => s.trim()).length} 単語</div>
         </div>
         <div className="flex gap-3">

@@ -222,6 +222,11 @@ function WordEditor({ words, onSave, onClose }: {
     if (!parsed.length) return alert('単語を1つ以上入力してください');
     onSave(parsed);
   };
+  const handleReset = () => {
+    if (window.confirm('デフォルトの単語リストに戻しますか？')) {
+      setText(DEFAULT_WORDS.join('\n'));
+    }
+  };
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
       onClick={e => e.target === e.currentTarget && onClose()}>
@@ -234,7 +239,10 @@ function WordEditor({ words, onSave, onClose }: {
         <textarea value={text} onChange={e => setText(e.target.value)} rows={14}
           className="w-full border border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300 font-mono"
           placeholder="単語1&#10;単語2&#10;単語3" />
-        <div className="text-xs text-gray-400 text-right">{text.split('\n').filter(s => s.trim()).length} 単語</div>
+        <div className="flex items-center justify-between">
+          <button onClick={handleReset} className="text-xs text-gray-400 hover:text-orange-500 underline transition-colors">デフォルトに戻す</button>
+          <div className="text-xs text-gray-400">{text.split('\n').filter(s => s.trim()).length} 単語</div>
+        </div>
         <div className="flex gap-3">
           <button onClick={onClose} className="flex-1 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">キャンセル</button>
           <button onClick={handleSave} className="flex-1 py-2 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-colors">保存</button>
